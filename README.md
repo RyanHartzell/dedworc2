@@ -14,3 +14,19 @@ This project will eventually allow for the following use and functionality:
 * Train a Pytorch reinforcement learning model to observe a dynamic crowd in a fixed space
 * Test and Evaluate learned model
 * (ULTIMATE GOAL) Run the learned model and display a simulation (and performance metrics) where all individual agents work collaboratively to navigate the environment and sense the underlying crowd's dynamics efficiently, tracking regions of interest or events of interest in the crowd over time
+
+
+## Requirements
+
+### Crowd Simulator
+
+* Must be Closed Environment
+* Must have particles objects
+* Particle objects must have dynamics (e.g. attraction, repulsion forces, etc.)
+* Must have a visualizer
+* Must have some form of observability
+* Must be able to check boundaries against a point
+* Must be integrated with GYM interface in pytorch
+
+#### Progress
+[] Test
