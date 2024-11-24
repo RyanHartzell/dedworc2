@@ -28,5 +28,15 @@ This project will eventually allow for the following use and functionality:
 * Must be able to check boundaries against a point
 * Must be integrated with GYM interface in pytorch
 
-#### Progress
-[] Test
+### Drone (Agents)
+
+* Must be able to move within boundary of environment
+* Must be able to observe local crowd state
+* Must be able to build internal map of global environment
+* Must own actor/critic modules
+* Must be able to visualize map
+    * Traces
+    * Current Crowd Belief state
+* Must have Random Walk mode
+* Must be able to flush  history to disk
+
