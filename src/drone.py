@@ -1,64 +1,60 @@
-"""
-Drone module containing Agent definition:
-
-REQUIREMENTS:
-=============
-* Must be able to move within boundary of environment
-* Must be able to observe local crowd state
-* Must be able to build internal map of global environment
-* Must own actor/critic modules
-* Must be able to visualize map
-    * Traces
-    * Current Crowd Belief state
-* Must have Random Walk mode
-* Must be able to flush  history to disk
-
-"""
-
-__authors__=["Ryan Hartzell", "Matt Desaulniers"]
+import pygame
+from crowd_sim_cons import *
 
 class Drone:
-    def __init__(self, env, pos_x=0.0, pos_y=0.0, fov=5.0) -> None:
-        # Basic characteristics
-        self._pos = (pos_x, pos_y)
-        self._fov = fov
+    def __init__(self, x, y):
+        self.position = pygame.math.Vector2(x, y)
+        self.velocity = pygame.math.Vector2(1, 1).normalize() * 2
 
-        # Packet Loss Rate (DEFAULT: Full efficiency)
-        self.plr = 0.0 # probability that messages to/from this drone are dropped/lost on global update
+    def patrol(self):
+        # Move towards the target (similar to particles)
+        direction_to_target = pygame.math.Vector2(TARGET) - self.position
+        if direction_to_target.length() > 0:
+            direction_to_target.normalize_ip()
+        self.velocity += direction_to_target * 0.1
 
-        # Belief map (over a fixed grid)
-        self.env = env # Reference to our simulation environment
-        self.belief = self.env.raster # Should be a masked array or fixed grid with -1 values? Check with Matt on his implementation
+        # Limit speed
+        if self.velocity.length() > MAX_SPEED:
+            self.velocity.scale_to_length(MAX_SPEED)
 
-        # Set horizon
-        self.horizon = 2.0 * self._fov
+        self.position += self.velocity
 
-        # Records and history
-        self.state_history = []
-        self.obs_history = []
+    def avoid_other_drones(self, drones):
+        for other in drones:
+            if other == self:
+                continue
+            distance = self.position.distance_to(other.position)
+            if distance < DRONE_RADIUS * 2:  # Avoid overlap of sensing radii
+                direction_away = self.position - other.position
+                if direction_away.length() > 0:
+                    direction_away.normalize_ip()
+                self.velocity += direction_away * 0.1
 
-    @property
-    def position(self):
-        return self._pos
-
-    @property
-    def fov(self):
-        return self._fov # This is basically just a radius about the Center of Mass
+    def sense(self, particles):
+        detected_particles = []
+        for particle in particles:
+            distance = self.position.distance_to(particle.position)
+            if distance < DRONE_RADIUS:
+                detected_particles.append(particle)
+        return detected_particles
     
-    def _merge_maps(self):
-        return
-
-    def step(self):
-        self.state_history.append(new_state)
-
-    def observe(self):
-        self.obs_history.append()
-
-    def render(self):
-        return
+    def detect_border_collision(self):
+        # Check for collisions with screen borders
+        if self.position.x - DRONE_RADIUS < 0 or self.position.x + DRONE_RADIUS > WIDTH:
+            self.velocity.x *= -1  # Reverse horizontal velocity
+            self.position.x = max(DRONE_RADIUS, min(WIDTH - DRONE_RADIUS, self.position.x))
+            
+        if self.position.y - DRONE_RADIUS < 0 or self.position.y + DRONE_RADIUS > HEIGHT:
+            self.velocity.y *= -1  # Reverse vertical velocity
+            self.position.y = max(DRONE_RADIUS, min(HEIGHT - DRONE_RADIUS, self.position.y))
 
 
-if __name__=="__main__":
-    print("Initializing Drone Test....")
 
-    drones = [Drone() for _ in range(3)]
+    def draw(self, detected_particles):
+        # Draw drone and sensing radius
+        pygame.draw.circle(screen, RED, (int(self.position.x), int(self.position.y)), 10)
+        pygame.draw.circle(screen, WHITE, (int(self.position.x), int(self.position.y)), DRONE_RADIUS, 1)
+
+        # Highlight detected particles
+        for particle in detected_particles:
+            pygame.draw.circle(screen, GREEN, (int(particle.position.x), int(particle.position.y)), PARTICLE_RADIUS)

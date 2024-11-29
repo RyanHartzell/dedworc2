@@ -1,0 +1,70 @@
+import pygame
+import random
+from crowd_sim_cons import *
+
+
+# Particle class
+class Particle:
+    def __init__(self, x, y):
+        self.position = pygame.math.Vector2(x, y)
+        self.velocity = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize() * MAX_SPEED
+
+    def move(self):
+        # Add a pseudorandom component to the velocity
+        random_walk = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+        
+        # Compute direction towards the target
+        direction_to_target = pygame.math.Vector2(TARGET) - self.position
+        if direction_to_target.length() > 0:
+            direction_to_target.normalize_ip()
+
+        # Update velocity with a mix of random walk and target attraction
+        self.velocity += random_walk + direction_to_target * 0.1
+        if self.velocity.length() > MAX_SPEED:
+            self.velocity.scale_to_length(MAX_SPEED)
+
+        self.position += self.velocity
+    
+    def detect_border_collision(self):
+        # Check for collisions with screen borders
+        if self.position.x - PARTICLE_RADIUS < 0 or self.position.x + PARTICLE_RADIUS > WIDTH:
+            self.velocity.x *= -1  # Reverse horizontal velocity
+            self.position.x = max(PARTICLE_RADIUS, min(WIDTH - PARTICLE_RADIUS, self.position.x))
+            
+        if self.position.y - PARTICLE_RADIUS < 0 or self.position.y + PARTICLE_RADIUS > HEIGHT:
+            self.velocity.y *= -1  # Reverse vertical velocity
+            self.position.y = max(PARTICLE_RADIUS, min(HEIGHT - PARTICLE_RADIUS, self.position.y))
+
+
+    def avoid_others(self, particles):
+        for other in particles:
+            if other == self:
+                continue
+            distance = self.position.distance_to(other.position)
+            if distance < PERSONAL_SPACE:
+                # Apply a repulsion force
+                direction_away = self.position - other.position
+                if direction_away.length() > 0:
+                    direction_away.normalize_ip()
+                self.velocity += direction_away * 0.5
+    
+    # This function picks a random point on the map Every particle within a radius of interest will make that their new target
+    def random_attractor(self):
+        attractor_location = pygame.math.Vector2(random.randint(PARTICLE_RADIUS, WIDTH - PARTICLE_RADIUS), random.randint(PARTICLE_RADIUS, HEIGHT - PARTICLE_RADIUS))
+        # Check for collisions with screen borders
+        distance = self.position.distance_to(attractor_location)
+        print(distance)
+        if distance <= 100:
+            self.velocity.x *= -50  # Reverse horizontal velocity
+            self.position.x = max(PARTICLE_RADIUS, min(WIDTH - PARTICLE_RADIUS, self.position.x))
+            self.velocity.y *= -50  # Reverse horizontal velocity
+            self.position.y = max(PARTICLE_RADIUS, min(WIDTH - PARTICLE_RADIUS, self.position.y))
+            
+
+
+    #  This function picks a random point on the map, repulsing any particle within a certain distance.
+    def random_repulsor(self):
+        pass
+
+    def draw(self):
+        pygame.draw.circle(screen, BLUE, (int(self.position.x), int(self.position.y)), PARTICLE_RADIUS)
