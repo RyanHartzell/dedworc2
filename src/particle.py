@@ -10,6 +10,7 @@ class Particle:
         self.position = pygame.math.Vector2(x, y)
         self.velocity = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize() * MAX_SPEED
         self.id = id
+        self.current_target = pygame.math.Vector2(TARGET)
         self.personal_space = random.lognormal(0,1)*PERSONAL_SPACE
 
     def get_position(self):
@@ -43,13 +44,13 @@ class Particle:
 
     def detect_stage_collision(self):
         # Check for collisions with screen borders
-        if self.position.x - PARTICLE_RADIUS < ((WIDTH // 2) - 20) or self.position.x + PARTICLE_RADIUS > ((WIDTH // 2) + 20):
+        
+        if self.position.distance_to(self.current_target) <= 200:
             self.velocity.x *= -1  # Reverse horizontal velocity
             self.position.x = max(PARTICLE_RADIUS, min(WIDTH - PARTICLE_RADIUS, self.position.x))
-            
-        if self.position.y - PARTICLE_RADIUS < ((0) - 20) or self.position.y + PARTICLE_RADIUS < ((0) + 20):
             self.velocity.y *= -1  # Reverse vertical velocity
             self.position.y = max(PARTICLE_RADIUS, min(HEIGHT - PARTICLE_RADIUS, self.position.y))
+            
 
 
     def avoid_others(self, particles):

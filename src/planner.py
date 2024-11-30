@@ -28,6 +28,7 @@ class Manager:
         # states = self.simulator.get_sim_state()
         # for state, p in zip(states, self.planners):
         for p in self.planners:
+            p.agent.map.instantaneous_occupancy_map = self.simulator.global_map.instantaneous_occupancy_map
             action = p.choose_action() # For greedy planner, will choose stochastically using belief map PDF as state transition matrix
             p.do_action(action)
 

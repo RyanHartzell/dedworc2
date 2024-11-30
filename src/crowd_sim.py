@@ -60,6 +60,7 @@ class Simulation():
                 particle.avoid_others(self.particles)
                 particle.detect_border_collision()
                 # particle.random_attractor()
+                particle.detect_stage_collision()
                 particle.move()
                 particle.draw()
 
@@ -103,8 +104,8 @@ class Simulation():
         for drone in self.drones:  
             # Update and draw the drone
             drone.avoid_other_drones(self.drones)
-            drone.patrol()
             drone.detect_border_collision()
+            # drone.patrol()
             detected_particles = drone.measure_particles(self.particles)
             drone.draw(detected_particles)
 

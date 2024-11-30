@@ -14,7 +14,7 @@ class Drone:
         direction_to_target = pygame.math.Vector2(target) - self.position
         if direction_to_target.length() > 0:
             direction_to_target.normalize_ip()
-        self.velocity += direction_to_target * 0.1
+        self.velocity += direction_to_target * .1
 
         # Limit speed
         if self.velocity.length() > MAX_SPEED:
