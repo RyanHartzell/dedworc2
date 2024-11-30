@@ -8,6 +8,7 @@ RH: TODO:
 
 import numpy as np
 from crowd_sim_cons import *
+from crowd_sim import Simulation
 
 # Single instance per agent
 # class IPlanner:
@@ -48,8 +49,9 @@ class GreedyPlanner:
     # Functions for choosing 
     def choose_action(self):
         # Select FLAT index from belief map given probabilities of state transition matrix
-        flatind = self.rng.choice(np.arange(self.agent.map.size), p=self.agent.map.flat)
-        return (self.agent.map.coordinate_grid[0].flat[flatind], self.agent.map.coordinate_grid[1].flat[flatind])
+        current_density_map = self.agent.map.get_density_map()
+        flatind = self.rng.choice(np.arange(current_density_map.size), p=current_density_map.flat)
+        return (self.agent.map.coordinate_mesh[0].flat[flatind], self.agent.map.coordinate_mesh[1].flat[flatind])
 
     def do_action(self, action):
         # Action should already be the target position as an X,Y tuple or something similar
@@ -64,10 +66,12 @@ class GreedyPlanner:
 
 if __name__=="__main__":
     # Init Crowd Simulator
+    Training_mode = True
+    crowd_sim = Simulation(Training_mode)
     
     # Init Manager
-
+    manager = Manager([GreedyPlanner(agent) for agent in crowd_sim.drones], crowd_sim)
     # Run loop
-
-
-    pass
+    while True:
+        crowd_sim.step()
+        manager.step()

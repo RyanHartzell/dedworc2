@@ -1,14 +1,20 @@
 import pygame
 import random
 from crowd_sim_cons import *
+from numpy import random
 
 
 # Particle class
 class Particle:
-    def __init__(self, x, y):
+    def __init__(self, x, y, id):
         self.position = pygame.math.Vector2(x, y)
         self.velocity = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize() * MAX_SPEED
+        self.id = id
+        self.personal_space = random.lognormal(0,1)*PERSONAL_SPACE
 
+    def get_position(self):
+        return (self.position[0], self.position[1])
+    
     def move(self):
         # Add a pseudorandom component to the velocity
         random_walk = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
@@ -35,13 +41,14 @@ class Particle:
             self.velocity.y *= -1  # Reverse vertical velocity
             self.position.y = max(PARTICLE_RADIUS, min(HEIGHT - PARTICLE_RADIUS, self.position.y))
 
-
+    def detect_stage_collision(self):
+        
     def avoid_others(self, particles):
         for other in particles:
             if other == self:
                 continue
             distance = self.position.distance_to(other.position)
-            if distance < PERSONAL_SPACE:
+            if distance < self.personal_space:
                 # Apply a repulsion force
                 direction_away = self.position - other.position
                 if direction_away.length() > 0:

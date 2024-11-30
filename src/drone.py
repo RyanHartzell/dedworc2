@@ -1,14 +1,17 @@
 import pygame
 from crowd_sim_cons import *
+from map import Map
 
 class Drone:
-    def __init__(self, x, y):
+    def __init__(self, x, y, id, map_shape):
         self.position = pygame.math.Vector2(x, y)
         self.velocity = pygame.math.Vector2(1, 1).normalize() * 2
+        self.id = id
+        self.map = Map(map_shape)
 
-    def patrol(self):
+    def patrol(self, target=TARGET):
         # Move towards the target (similar to particles)
-        direction_to_target = pygame.math.Vector2(TARGET) - self.position
+        direction_to_target = pygame.math.Vector2(target) - self.position
         if direction_to_target.length() > 0:
             direction_to_target.normalize_ip()
         self.velocity += direction_to_target * 0.1
@@ -28,14 +31,15 @@ class Drone:
                 direction_away = self.position - other.position
                 if direction_away.length() > 0:
                     direction_away.normalize_ip()
-                self.velocity += direction_away * 0.1
+                self.velocity += direction_away * DRONE_REPULSION_FORCE
 
-    def sense(self, particles):
+    def measure_particles(self, particles):
         detected_particles = []
         for particle in particles:
             distance = self.position.distance_to(particle.position)
             if distance < DRONE_RADIUS:
                 detected_particles.append(particle)
+        self.map.update_instantaneous_occupancy_map(detected_particles)
         return detected_particles
     
     def detect_border_collision(self):
@@ -57,4 +61,5 @@ class Drone:
 
         # Highlight detected particles
         for particle in detected_particles:
+
             pygame.draw.circle(screen, GREEN, (int(particle.position.x), int(particle.position.y)), PARTICLE_RADIUS)
