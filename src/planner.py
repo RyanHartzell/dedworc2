@@ -49,7 +49,7 @@ class GreedyPlanner:
     def choose_action(self):
         # Select FLAT index from belief map given probabilities of state transition matrix
         flatind = self.rng.choice(np.arange(self.agent.map.size), p=self.agent.map.flat)
-        return (self.agent.map.gridX.flat[flatind], self.agent.map.gridY.flat[flatind])
+        return (self.agent.map.coordinate_grid[0].flat[flatind], self.agent.map.coordinate_grid[1].flat[flatind])
 
     def do_action(self, action):
         # Action should already be the target position as an X,Y tuple or something similar
