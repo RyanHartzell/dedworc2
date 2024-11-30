@@ -42,7 +42,16 @@ class Particle:
             self.position.y = max(PARTICLE_RADIUS, min(HEIGHT - PARTICLE_RADIUS, self.position.y))
 
     def detect_stage_collision(self):
-        
+        # Check for collisions with screen borders
+        if self.position.x - PARTICLE_RADIUS < ((WIDTH // 2) - 20) or self.position.x + PARTICLE_RADIUS > ((WIDTH // 2) + 20):
+            self.velocity.x *= -1  # Reverse horizontal velocity
+            self.position.x = max(PARTICLE_RADIUS, min(WIDTH - PARTICLE_RADIUS, self.position.x))
+            
+        if self.position.y - PARTICLE_RADIUS < ((0) - 20) or self.position.y + PARTICLE_RADIUS < ((0) + 20):
+            self.velocity.y *= -1  # Reverse vertical velocity
+            self.position.y = max(PARTICLE_RADIUS, min(HEIGHT - PARTICLE_RADIUS, self.position.y))
+
+
     def avoid_others(self, particles):
         for other in particles:
             if other == self:

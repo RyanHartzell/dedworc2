@@ -95,6 +95,7 @@ class Simulation():
         for particle in self.particles:
             particle.avoid_others(self.particles)
             particle.detect_border_collision()
+            particle.detect_stage_collision()
             # particle.random_attractor()
             particle.move()
             particle.draw()
