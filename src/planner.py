@@ -9,7 +9,7 @@ RH: TODO:
 import numpy as np
 from crowd_sim_cons import *
 from crowd_sim import Simulation
-
+from recorder import PygameRecord
 # Single instance per agent
 # class IPlanner:
 #     def __init__(self, local_density_map=None) -> None:
@@ -70,9 +70,14 @@ if __name__=="__main__":
     Training_mode = True
     crowd_sim = Simulation(Training_mode)
     
-    # Init Manager
-    manager = Manager([GreedyPlanner(agent) for agent in crowd_sim.drones], crowd_sim)
-    # Run loop
-    while True:
-        crowd_sim.step()
-        manager.step()
+    with PygameRecord("output.gif", FRAME_RATE) as recorder:
+    
+        # Init Manager
+        manager = Manager([GreedyPlanner(agent) for agent in crowd_sim.drones], crowd_sim)
+        # Run loop
+        while True:
+            crowd_sim.step()
+            recorder.add_frame()  # Add frame to recorder
+            manager.step()
+    recorder.save()
+    

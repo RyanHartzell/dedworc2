@@ -26,6 +26,11 @@ class Simulation():
         for id in range(NUM_PARTICLES):
             x = random.randint(PARTICLE_RADIUS, WIDTH - PARTICLE_RADIUS)
             y = random.randint(PARTICLE_RADIUS, HEIGHT - PARTICLE_RADIUS)
+            proposed_position = pygame.math.Vector2(x, y)
+            while(proposed_position.distance_to(pygame.math.Vector2(TARGET)) < TARGET_BARRIER):
+                x = random.randint(PARTICLE_RADIUS, WIDTH - PARTICLE_RADIUS)
+                y = random.randint(PARTICLE_RADIUS, HEIGHT - PARTICLE_RADIUS)
+                proposed_position = pygame.math.Vector2(x, y)
             particles.append(Particle(x, y, id))
         return particles
 

@@ -15,13 +15,16 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
-# Simulation settings
+# Simulation Settings
 GRID_SAMPLING = 3.5
-NUM_PARTICLES = 1000
-NUM_DRONES = 3
-PARTICLE_RADIUS = 8
-PERSONAL_SPACE = 10
 TARGET = (WIDTH // 2, 0)
-MAX_SPEED = 2
+# Particle Settings
+NUM_PARTICLES = 1000
+PARTICLE_RADIUS = 8
+PERSONAL_SPACE = 8
+TARGET_BARRIER = 200
+# Drone Settings
+NUM_DRONES = 3
+MAX_SPEED = 3
 DRONE_RADIUS = 70  # Drone's sensing radius
 DRONE_REPULSION_FORCE = .1
