@@ -25,11 +25,15 @@ class Map:
         
 
     def update_instantaneous_occupancy_map(self, particles):
+        # Optionally calculate curl and div by saving last map
+        old = self.instantaneous_occupancy_map.copy()
         self.instantaneous_occupancy_map = np.zeros(self.mesh_shape)
         for particle in particles:
             position = particle.get_position()
             
             self.instantaneous_occupancy_map[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING) )//1] += 1
+
+        self.get_curl_div_map(old)
 
     def get_density_map(self):
         # tophat = np.array([[0,1,0],[1,1,1],[0,1,0]])
@@ -41,6 +45,55 @@ class Map:
             self.density[...] = convolve2d(self.instantaneous_occupancy_map, tophat, mode='same')
             self.density = self.density/self.density.sum()
         return self.density
+
+    # (vm, vp) = crowd_sim.global_map.get_velocity_mag_and_phase_map()
+    def get_velocity_mag_and_phase_map(self, particles, quantized_bins=8):
+        
+        velmag = np.zeros_like(self.mesh_shape)
+        velphase = np.zeros_like(list(self.mesh_shape)+[quantized_bins])
+
+        for particle in particles:
+            position = particle.get_position()
+            r, az = particle.velocity.as_polar()
+            bin = np.deg2rad(360 / quantized_bins)
+            q = az // bin
+             
+            # Bin by position, avg magnitude, then bin by phase
+            velmag[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING) )//1] += r
+            velphase[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING))//1, q ] += az
+
+        # Return avg velmag and average velocity
+        return (velmag / self.instantaneous_occupancy_map, velphase / self.instantaneous_occupancy_map)
+
+    # (curl, div) = crowd_sim.global_map.get_curl_div_map()
+    def get_curl_div_map(self, old_occupancy_map):
+        curl = np.zeros_like(self.mesh_shape)
+        div = np.zeros_like(self.mesh_shape)
+             
+        # summing tiles across occupancy map Bin by position, avg magnitude, then bin by phase
+
+
+
+        # Return avg velmag and average velocity
+        return curl, div
+
+    # (skew, kurt) = crowd_sim.global_map.get_skew_curt_map()
+    def get_skew_curt_map(self):
+        velmag = np.zeros_like(self.mesh_shape)
+        velphase = np.zeros_like(list(self.mesh_shape)+[quantized_bins])
+
+        for particle in particles:
+            position = particle.get_position()
+            r, az = particle.velocity.as_polar()
+            bin = np.deg2rad(360 / quantized_bins)
+            q = az // bin
+             
+            # Bin by position, avg magnitude, then bin by phase
+            velmag[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING) )//1] += r
+            velphase[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING))//1, q ] += az
+
+        # Return avg velmag and average velocity
+        return (velmag / self.instantaneous_occupancy_map, velphase / self.instantaneous_occupancy_map)
 
 
 if __name__=="__main__":
