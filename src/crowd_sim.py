@@ -7,7 +7,8 @@ from particle import Particle
 from map import Map
 
 class Simulation():
-    def __init__(self, training_mode = False) -> None:
+    def __init__(self, training_mode = False, headless=False) -> None:
+        self.headless = headless
         self.particles = self.create_particles()
         self.drones = self.create_drones()
         self.global_map = Map((HEIGHT, WIDTH))
@@ -81,7 +82,8 @@ class Simulation():
             # Draw the target
             pygame.draw.circle(screen, WHITE, TARGET, 10)
 
-            pygame.display.flip()
+            if not self.headless:
+                pygame.display.flip()
             clock.tick(FRAME_RATE)
 
             while(not self.advance):
@@ -118,8 +120,8 @@ class Simulation():
         # Draw the target
         pygame.draw.circle(screen, WHITE, TARGET, 10)
 
-        pygame.display.flip()
-            
+        if not self.headless:
+            pygame.display.flip()            
 
             
             

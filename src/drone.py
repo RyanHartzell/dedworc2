@@ -12,15 +12,24 @@ class Drone:
     def patrol(self, target=TARGET):
         # Move towards the target (similar to particles)
         direction_to_target = pygame.math.Vector2(target) - self.position
+        speed_proportion = MAX_SPEED
+        if direction_to_target.magnitude() < MAX_SPEED:
+            speed_proportion = direction_to_target.magnitude()
         if direction_to_target.length() > 0:
             direction_to_target.normalize_ip()
-        self.velocity += direction_to_target * .1
+
+        self.velocity = direction_to_target * speed_proportion
+        # self.velocity += direction_to_target * .1
+        # self.velocity = direction_to_target * MAX_SPEED
 
         # Limit speed
         if self.velocity.length() > MAX_SPEED:
             self.velocity.scale_to_length(MAX_SPEED)
 
         self.position += self.velocity
+        
+        pygame.draw.circle(screen, (255,255,255), target, 10)
+
 
     def avoid_other_drones(self, drones):
         for other in drones:
@@ -40,6 +49,7 @@ class Drone:
             if distance < DRONE_RADIUS:
                 detected_particles.append(particle)
         self.map.update_instantaneous_occupancy_map(detected_particles)
+        self.current_observed_particles = set(detected_particles)
         return detected_particles
     
     def detect_border_collision(self):

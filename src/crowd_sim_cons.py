@@ -18,13 +18,16 @@ GREEN = (0, 255, 0)
 # Simulation Settings
 GRID_SAMPLING = 3.5
 TARGET = (WIDTH // 2, 0)
+
 # Particle Settings
 NUM_PARTICLES = 1000
 PARTICLE_RADIUS = 8
-PERSONAL_SPACE = 8
+PARTICLE_MAX_SPEED = 3
+PERSONAL_SPACE = 10
 TARGET_BARRIER = 200
+
 # Drone Settings
 NUM_DRONES = 3
-MAX_SPEED = 3
+MAX_SPEED = max(WIDTH, HEIGHT) / 50 # We should probably base this off the number of frames so the drone can traverse the full width of the environment
 DRONE_RADIUS = 70  # Drone's sensing radius
-DRONE_REPULSION_FORCE = .1
+DRONE_REPULSION_FORCE = .1 * 500

@@ -21,6 +21,7 @@ import torch.nn.functional as F
 import warnings
 from tqdm import tqdm
 import json
+import os
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -30,6 +31,11 @@ class Record:
         self.observations = [None]*l
         self.actions = np.zeros(l)
         self.rewards = np.zeros(l)
+    def as_dict(self):
+        return {"observations": np.vstack(self.observations).tolist(), 
+                "actions": self.actions.tolist(),
+                "rewards": self.rewards.tolist()
+                }
 
 class Records:
     def __init__(self, planners, max_num_steps):
@@ -43,10 +49,24 @@ class Manager:
         self.simulator = simulator
         # self.STEP_NUMBER = -1
 
-    def save(self):
+    def save(self, history=None, note=None):
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        if not os.path.exists(f'models/{timestamp}'):
+            os.makedirs(f'models/{timestamp}', exist_ok=True)
+        
         for p in self.planners:
             p.policy.save(f'models/{timestamp}/drone_{p.agent.id}_policy_model.ptm')
+
+        if history is not None:
+            # Get each Record as a dictionary, within a records dictionary, within a list, and convert to json?
+            with open(f'models/{timestamp}/history.json', 'w') as f:
+                j = json.dump({"note": note, "history": [{k.agent.id: v.as_dict() for k,v in records.records.items()} for records in history]}, f)
+
+            cumrewards = np.asarray([[np.sum(pr.rewards) for pr in records.records.values()] for records in history])
+            # Plot and save the reward curve
+            plt.plot(cumrewards)
+            plt.legend(labels=range(len(crowd_sim.drones)))
+            plt.savefig(f'models/{timestamp}/cumulative_rewards.png')
 
     def step(self):
         # states = self.simulator.get_sim_state()
@@ -66,21 +86,28 @@ class Manager:
         training_history = [None]*episodes
 
         for episode in tqdm(range(episodes)):
+            # Init drones at beginning of episode in RANDOM LOCATIONS, but NOT the crowd (basically allow for burn-in)
+            x = np.random.uniform(DRONE_RADIUS, WIDTH - DRONE_RADIUS, size=NUM_DRONES)
+            y = np.random.uniform(DRONE_RADIUS, HEIGHT - DRONE_RADIUS, size=NUM_DRONES)
+            for id in range(NUM_DRONES):
+                self.simulator.drones[id].position.x = x[id]
+                self.simulator.drones[id].position.y = y[id]
+
             records = Records(self.planners, max_num_steps)
             for step in range(max_num_steps):
                 self.simulator.step()
                 for p in self.planners:
-                    observation, action, reward = p.step(self.simulator.global_map.instantaneous_occupancy_map, train=True)
+                    observation, action = p.step(self.simulator.global_map.instantaneous_occupancy_map, train=True)
                     r = records[p]
-                    r.observations.append(observation)
+                    r.observations[step] = observation
                     r.actions[step] = action
-                    r.rewards[step] = reward
+                    r.rewards[step] = (self.reward(p.agent) - self.cost(p.agent, self.simulator.drones)) * p.get_discount_factor() ** step
         
                 self.simulator.advance = True
 
             # For each observer, update its corresponding policy by ID
             for p in self.planners:
-                deltas = np.asarray(self.calculate_deltas(records[p].rewards))
+                deltas = np.asarray(self.calculate_deltas(p, records[p].rewards))
                 p.policy.update(np.vstack(records[p].observations), records[p].actions, deltas)
 
             # Store historical records for episode
@@ -103,10 +130,22 @@ class Manager:
         for t in reversed(range(0, T - 1)):
             discounted_future_rewards[t] = (
                 rewards[t]
-                + discounted_future_rewards[t + 1] * self.mdp.get_discount_factor()
+                + discounted_future_rewards[t + 1] * mdp.get_discount_factor()
             )
         deltas = (mdp.get_discount_factor() ** np.arange(T)) * discounted_future_rewards
         return deltas
+    
+    def cost(self, agent, agents):
+        cost = 0
+        for other in agents:
+            if other.id != agent.id:
+                cost += len(set.intersection(agent.current_observed_particles, other.current_observed_particles))
+        return cost
+    
+    def reward(self, agent):
+        reward = len(agent.current_observed_particles)
+        return reward
+
 
 # Single instance per agent?
 class GreedyPlanner:
@@ -128,24 +167,12 @@ class GreedyPlanner:
         # Select FLAT index from belief map given probabilities of state transition matrix
         current_density_map = self.agent.map.get_density_map()
         flatind = self.rng.choice(np.arange(current_density_map.size), p=current_density_map.flat)
-        return (self.agent.map.coordinate_mesh[0].flat[flatind], self.agent.map.coordinate_mesh[1].flat[flatind])
+        return flatind
 
     def do_action(self, action):
-        # Action should already be the target position as an X,Y tuple or something similar
-        self.agent.patrol(action) # Gives the drone a point to try to travel to
+        # Convert action to a target position as an X,Y tuple
+        self.agent.patrol((self.agent.map.coordinate_mesh[0].flat[action], self.agent.map.coordinate_mesh[1].flat[action])) # Gives the drone a point to try to travel to
 
-
-###############################################
-
-# MATT
-def compute_reward():
-    reward = 0.0
-    return reward
-
-# MATT
-def compute_cost():
-    cost = 0.0
-    return cost
 
 class DroneMDPPlanner:
     def __init__(
@@ -199,29 +226,27 @@ class DroneMDPPlanner:
         return self.agent.id < other.agent.id
 
     # Non-training forward pass!
-    def step(self, global_inst_occ_map, step_index=None, train=False):
+    def step(self, global_inst_occ_map, train=False):
         self.agent.map.instantaneous_occupancy_map = global_inst_occ_map
         action = self.choose_action()
         self.do_action(action)
 
         if train:
-            # Calculate reward and cost, return to training loop for capture
-            r = self.compute_reward(action, step_index)
-            c = self.compute_cost(action, step_index)
-            return self.rlobsvec_prealloc, action, r - c
+            return self.rlobsvec_prealloc, action
 
     # SINGLE STEP EXECUTION WITH ACTIVE POLICY FOR SINGLE AGENT!
     def choose_action(self):
         # construct observational state vector
-        posidx = self.agent.position.get_value()
-        self.rlobsvec_prealloc[...] = np.concatenate([posidx, self.agent.get_density().flat])
+        self.rlobsvec_prealloc[...] = np.concatenate([[self.agent.position.x/WIDTH, self.agent.position.y/HEIGHT], self.agent.map.get_density_map().flat])
 
         # choose new action
-        action = self.policy.select_action(self.rlobsvec_prealloc)
+        action = self.policy.select_action(self.rlobsvec_prealloc) # action is a flattened index corresponding to action space aka coordinate mesh
         return action
 
     def do_action(self, action):
-        self.agent.patrol(action)
+        # THIS EXPECTS A FLAT INDEX AS THE ACTION
+        target = (self.agent.map.coordinate_mesh[0].flat[action], self.agent.map.coordinate_mesh[1].flat[action])
+        self.agent.patrol(target)
 
 # No changes needed probably!!!
 class DeepNeuralNetworkPolicy:
@@ -408,16 +433,19 @@ def viz_stack(hms, typeof='density', to_disk=False, filename='test'):
     return doc
 
 if __name__=="__main__":
-
+    import sys
     import time
     import matplotlib.pyplot as plt
+
+    # Load optional note
+    note = ''.join(sys.argv[1:])
 
     # Init Crowd Simulator
     Training_mode = True
     PLANNER_TYPE = 'mdp' # Takes either 'greedy' | 'mdp'
     MODEL_FILE = None # "some_file.v1.ptm"
 
-    crowd_sim = Simulation(Training_mode)
+    crowd_sim = Simulation(Training_mode, headless=False)
     
     # with PygameRecord("output.gif", FRAME_RATE) as recorder:
     
@@ -428,17 +456,23 @@ if __name__=="__main__":
 
     elif PLANNER_TYPE == 'mdp':
 
-        state_space = crowd_sim.global_map.mesh_arrays[0].size * 3 + 1
-        action_space = crowd_sim.global_map.mesh_arrays[0].size
-        manager = Manager([DroneMDPPlanner(agent, DeepNeuralNetworkPolicy(state_space, action_space, 128), state_space, action_space, discount_factor=0.98) for agent in crowd_sim.drones])
+        state_space = crowd_sim.global_map.density.size + 2
+        action_space = crowd_sim.global_map.density.size
+        manager = Manager([DroneMDPPlanner(agent, DeepNeuralNetworkPolicy(state_space, action_space, 64), state_space, action_space, discount_factor=0.91) for agent in crowd_sim.drones], crowd_sim)
 
         if MODEL_FILE:
             manager.load(MODEL_FILE) # load weights from some file
         else:
-            manager.train(episodes=10, episode_max_len=50) # otherwise, train with some number of episodes
+            history = manager.train(25, 50) # otherwise, train with some number of episodes
 
-    # Save all policies
-    manager.save()
+    # Save all policies + the history!
+    manager.save(history)
+
+    # Make Cumulative Reward plot
+    cumrewards = np.asarray([[np.sum(pr.rewards) for pr in records.records.values()] for records in history])
+    plt.plot(cumrewards)
+    plt.legend(labels=range(len(crowd_sim.drones)))
+    plt.show()
 
     # # Practice for heuristic calculations
     # crowd_sim.step()

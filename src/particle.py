@@ -8,7 +8,7 @@ from numpy import random
 class Particle:
     def __init__(self, x, y, id):
         self.position = pygame.math.Vector2(x, y)
-        self.velocity = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize() * MAX_SPEED
+        self.velocity = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize() * PARTICLE_MAX_SPEED
         self.id = id
         self.current_target = pygame.math.Vector2(TARGET)
         # self.personal_space = random.lognormal(0,1)*PERSONAL_SPACE
@@ -28,8 +28,8 @@ class Particle:
 
         # Update velocity with a mix of random walk and target attraction
         self.velocity += random_walk + direction_to_target * 0.1
-        if self.velocity.length() > MAX_SPEED:
-            self.velocity.scale_to_length(MAX_SPEED)
+        if self.velocity.length() > PARTICLE_MAX_SPEED:
+            self.velocity.scale_to_length(PARTICLE_MAX_SPEED)
 
         self.position += self.velocity
     

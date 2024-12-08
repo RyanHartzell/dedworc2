@@ -16,8 +16,8 @@ class Map:
         self.mesh_arrays = (np.linspace(0, 600, num=int(600.0 / (DRONE_RADIUS / GRID_SAMPLING))), np.linspace(0, 800, num=int(800.0 / (DRONE_RADIUS / GRID_SAMPLING))))
         self.mesh_shape = (int(600.0 / (DRONE_RADIUS / GRID_SAMPLING)), int(800.0 / (DRONE_RADIUS / GRID_SAMPLING)))
 
-        print(np.linspace(0, 600, num=int(600.0 / (DRONE_RADIUS / GRID_SAMPLING))))
-        print(np.linspace(0, 800, num=int(800.0 / (DRONE_RADIUS / GRID_SAMPLING))))
+        # print(np.linspace(0, 600, num=int(600.0 / (DRONE_RADIUS / GRID_SAMPLING))))
+        # print(np.linspace(0, 800, num=int(800.0 / (DRONE_RADIUS / GRID_SAMPLING))))
 
         self.instantaneous_occupancy_map = np.zeros(self.mesh_shape)
         self.density = np.zeros_like(self.instantaneous_occupancy_map)
