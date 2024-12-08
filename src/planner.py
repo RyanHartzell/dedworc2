@@ -9,6 +9,7 @@ RH: TODO:
 import numpy as np
 from crowd_sim_cons import *
 from crowd_sim import Simulation
+from recorder import PygameRecord
 from datetime import datetime
 
 import torch
@@ -417,6 +418,8 @@ if __name__=="__main__":
     MODEL_FILE = None # "some_file.v1.ptm"
 
     crowd_sim = Simulation(Training_mode)
+    
+    # with PygameRecord("output.gif", FRAME_RATE) as recorder:
     
     # Init Manager
     if PLANNER_TYPE == 'greedy':
