@@ -27,7 +27,7 @@ PERSONAL_SPACE = 10
 TARGET_BARRIER = 200
 
 # Drone Settings
-NUM_DRONES = 3
-MAX_SPEED = max(WIDTH, HEIGHT) / 50 # We should probably base this off the number of frames so the drone can traverse the full width of the environment
+NUM_DRONES = 1
+MAX_SPEED = max(WIDTH, HEIGHT) / 30 # We should probably base this off the number of frames so the drone can traverse the full width of the environment
 DRONE_RADIUS = 70  # Drone's sensing radius
 DRONE_REPULSION_FORCE = .1 * 500

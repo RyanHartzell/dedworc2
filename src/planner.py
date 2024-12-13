@@ -11,6 +11,7 @@ from crowd_sim_cons import *
 from crowd_sim import Simulation
 from recorder import PygameRecord
 from datetime import datetime
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -31,11 +32,17 @@ class Record:
         self.observations = [None]*l
         self.actions = np.zeros(l)
         self.rewards = np.zeros(l)
-    def as_dict(self):
-        return {"observations": np.vstack(self.observations).tolist(), 
-                "actions": self.actions.tolist(),
-                "rewards": self.rewards.tolist()
-                }
+    def as_dict(self, tiny=True):
+        if tiny:
+            return {"position": np.vstack(self.observations)[:,:2].tolist(), 
+                    "actions": self.actions.tolist(),
+                    "rewards": self.rewards.tolist()
+                    }
+        else:
+            return {"observations": np.vstack(self.observations).tolist(), 
+                    "actions": self.actions.tolist(),
+                    "rewards": self.rewards.tolist()
+                    }
 
 class Records:
     def __init__(self, planners, max_num_steps):
@@ -63,9 +70,13 @@ class Manager:
                 j = json.dump({"note": note, "history": [{k.agent.id: v.as_dict() for k,v in records.records.items()} for records in history]}, f)
 
             cumrewards = np.asarray([[np.sum(pr.rewards) for pr in records.records.values()] for records in history])
+
             # Plot and save the reward curve
             plt.plot(cumrewards)
-            plt.legend(labels=range(len(crowd_sim.drones)))
+            plt.title('Cumulative Rewards Trace')
+            plt.xlabel('Episode')
+            plt.ylabel('Total Episode Reward')
+            plt.legend()
             plt.savefig(f'models/{timestamp}/cumulative_rewards.png')
 
     def step(self):
@@ -101,14 +112,17 @@ class Manager:
                     r = records[p]
                     r.observations[step] = observation
                     r.actions[step] = action
-                    r.rewards[step] = (self.reward(p.agent) - self.cost(p.agent, self.simulator.drones)) * p.get_discount_factor() ** step
+                    r.rewards[step] = (self.reward(p.agent) - self.cost(p.agent, self.simulator.drones)) #* p.get_discount_factor() ** step
         
                 self.simulator.advance = True
 
             # For each observer, update its corresponding policy by ID
             for p in self.planners:
-                deltas = np.asarray(self.calculate_deltas(p, records[p].rewards))
-                p.policy.update(np.vstack(records[p].observations), records[p].actions, deltas)
+                # deltas = np.asarray(self.calculate_deltas(p, records[p].rewards))
+                # p.policy.update(np.vstack(records[p].observations), records[p].actions, deltas)
+                
+                # Changing this to just do the policy update with Pytorch implementation all at once
+                p.policy.update(np.vstack(records[p].observations), records[p].actions, records[p].rewards, p.get_discount_factor())
 
             # Store historical records for episode
             training_history[episode] = records
@@ -116,24 +130,29 @@ class Manager:
         # Return the raw data which we can then investigate and plot to show convergence of policy over time
         return training_history
 
+    # A better name for this is the 'return' which is discounted future rewards (cumsum of reversed rewards with gamma applied to each step *relative* to step t from which each sum is performed)
     def calculate_deltas(self, mdp, rewards):
-        """
-        Generate a list of the discounted future rewards at each step of an episode
-        Note that discounted_reward[T-2] = rewards[T-1] + discounted_reward[T-1] * gamma.
-        We can use that pattern to populate the discounted_rewards array.
-        """
-        T = len(rewards)
-        discounted_future_rewards = np.zeros(T)
+        # """
+        # Generate a list of the discounted future rewards at each step of an episode
+        # Note that discounted_reward[T-2] = rewards[T-1] + discounted_reward[T-1] * gamma.
+        # We can use that pattern to populate the discounted_rewards array.
+        # """
+        # T = len(rewards)
+        # discounted_future_rewards = np.zeros(T)
 
-        # The final discounted reward is the reward you get at that step
-        discounted_future_rewards[-1] = rewards[-1]
-        for t in reversed(range(0, T - 1)):
-            discounted_future_rewards[t] = (
-                rewards[t]
-                + discounted_future_rewards[t + 1] * mdp.get_discount_factor()
-            )
-        deltas = (mdp.get_discount_factor() ** np.arange(T)) * discounted_future_rewards
-        return deltas
+        # # The final discounted reward is the reward you get at that step
+        # discounted_future_rewards[-1] = rewards[-1]
+        # for t in reversed(range(0, T - 1)):
+        #     discounted_future_rewards[t] = (
+        #         rewards[t]
+        #         + discounted_future_rewards[t + 1] * mdp.get_discount_factor()
+        #     )
+        # deltas = (mdp.get_discount_factor() ** np.arange(T)) * discounted_future_rewards
+        # return deltas
+
+        # GOING TO TRY PYTORCH VERSION OF THIS
+        gamma = mdp.get_discount_factor()
+
     
     def cost(self, agent, agents):
         cost = 0
@@ -327,21 +346,47 @@ class DeepNeuralNetworkPolicy:
         log_prob = action_distribution.log_prob(actions.squeeze(-1))
         return log_prob.view(1, -1)
 
-    def update(self, states, actions, deltas):
-        # Convert to tensors to use in the network
-        deltas = torch.as_tensor(deltas, dtype=torch.float32, device=self.device)
+    # def update(self, states, actions, deltas):
+    #     # Convert to tensors to use in the network
+    #     deltas = torch.as_tensor(deltas, dtype=torch.float32, device=self.device)
+    #     states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+    #     actions = torch.as_tensor(actions, device=self.device)
+
+    #     action_log_probs = self.evaluate_actions(states, actions)
+
+    #     # Construct a loss function, using negative because we want to descend,
+    #     # not ascend the gradient
+    #     loss = -(action_log_probs * deltas).sum()
+    #     self.optimiser.zero_grad()
+    #     loss.backward()
+
+    #     # Take a gradient descent step
+    #     self.optimiser.step()
+
+    def update(self, states, actions, rewards, gamma):
         states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
         actions = torch.as_tensor(actions, device=self.device)
+        
+        R = 0
+        policy_loss = []
+        returns = deque()
+        for r in rewards[::-1]:
+            R = r + gamma * R
+            returns.appendleft(R)
+        returns = torch.tensor(returns)
 
-        action_log_probs = self.evaluate_actions(states, actions)
+        eps = np.finfo(np.float32).eps.item()
+        returns = (returns - returns.mean()) / (returns.std() + eps)
 
-        # Construct a loss function, using negative because we want to descend,
-        # not ascend the gradient
-        loss = -(action_log_probs * deltas).sum()
+        # Compute log_probs of actions given states (evaluate_actions?)
+        log_probs = self.evaluate_actions(states, actions)
+
+        for log_prob, R in zip(log_probs, returns):
+            policy_loss.append(-log_prob * R)
+
         self.optimiser.zero_grad()
-        loss.backward()
-
-        # Take a gradient descent step
+        policy_loss = torch.cat(policy_loss).sum()
+        policy_loss.backward()
         self.optimiser.step()
 
     def save(self, filename):
@@ -445,7 +490,7 @@ if __name__=="__main__":
     PLANNER_TYPE = 'mdp' # Takes either 'greedy' | 'mdp'
     MODEL_FILE = None # "some_file.v1.ptm"
 
-    crowd_sim = Simulation(Training_mode, headless=False)
+    crowd_sim = Simulation(Training_mode, headless=True)
     
     # with PygameRecord("output.gif", FRAME_RATE) as recorder:
     
@@ -458,20 +503,23 @@ if __name__=="__main__":
 
         state_space = crowd_sim.global_map.density.size + 2
         action_space = crowd_sim.global_map.density.size
-        manager = Manager([DroneMDPPlanner(agent, DeepNeuralNetworkPolicy(state_space, action_space, 64), state_space, action_space, discount_factor=0.91) for agent in crowd_sim.drones], crowd_sim)
+        manager = Manager([DroneMDPPlanner(agent, DeepNeuralNetworkPolicy(state_space, action_space, 256), state_space, action_space, discount_factor=0.91) for agent in crowd_sim.drones], crowd_sim)
 
         if MODEL_FILE:
             manager.load(MODEL_FILE) # load weights from some file
         else:
-            history = manager.train(25, 50) # otherwise, train with some number of episodes
+            history = manager.train(2000, 15) # otherwise, train with some number of episodes
 
-    # Save all policies + the history!
-    manager.save(history)
+        # Save all policies + the history!
+        manager.save(history, note)
 
     # Make Cumulative Reward plot
     cumrewards = np.asarray([[np.sum(pr.rewards) for pr in records.records.values()] for records in history])
-    plt.plot(cumrewards)
+    plt.plot(np.convolve(cumrewards, np.ones(15)/15., 'same'))
     plt.legend(labels=range(len(crowd_sim.drones)))
+    plt.title('Smoothed Reward Trace')
+    plt.xlabel('Episode #')
+    plt.ylabel('Episode Return')
     plt.show()
 
     # # Practice for heuristic calculations

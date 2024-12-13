@@ -15,6 +15,7 @@ class Map:
         self.map_shape = map_shape
         self.mesh_arrays = (np.linspace(0, 600, num=int(600.0 / (DRONE_RADIUS / GRID_SAMPLING))), np.linspace(0, 800, num=int(800.0 / (DRONE_RADIUS / GRID_SAMPLING))))
         self.mesh_shape = (int(600.0 / (DRONE_RADIUS / GRID_SAMPLING)), int(800.0 / (DRONE_RADIUS / GRID_SAMPLING)))
+        print(self.mesh_shape)
 
         # print(np.linspace(0, 600, num=int(600.0 / (DRONE_RADIUS / GRID_SAMPLING))))
         # print(np.linspace(0, 800, num=int(800.0 / (DRONE_RADIUS / GRID_SAMPLING))))
@@ -26,14 +27,14 @@ class Map:
 
     def update_instantaneous_occupancy_map(self, particles):
         # Optionally calculate curl and div by saving last map
-        old = self.instantaneous_occupancy_map.copy()
+        # old = self.instantaneous_occupancy_map.copy()
         self.instantaneous_occupancy_map = np.zeros(self.mesh_shape)
         for particle in particles:
             position = particle.get_position()
             
             self.instantaneous_occupancy_map[int((position[1] / (DRONE_RADIUS / GRID_SAMPLING) )//1), int(position[0] / (DRONE_RADIUS / GRID_SAMPLING) )//1] += 1
 
-        self.get_curl_div_map(old)
+        # self.get_curl_div_map(old)
 
     def get_density_map(self):
         # tophat = np.array([[0,1,0],[1,1,1],[0,1,0]])
